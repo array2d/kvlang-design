@@ -443,6 +443,41 @@ kvlang 没有 `&` 取址运算符——变量名本身就是 kvspace 路径。`x
 
 `ptr.val` → `at(ptr, "val")` → `kv.Get(ptr/val)`。Pratt 循环中 `.` 作为后缀运算符，对标 C `ptr->val`、Go `ptr.val`。写侧 `42 -> ptr.val` 展开为 `set(ptr, "val", 42) -> ptr`。Scanner 将 `.` 作为 token 分隔符和独立 Dot token，`at`/`set` builtin 支持字符串字段名做 kvspace 路径拼接。
 
+### 10.1 静态字段：`h.field`
+
+```
+h.field  →  at(h, "field")    # field 是字面量字符串
+```
+
+解析时 Pratt 消费 `.` 后读到普通标识符 → 作为 `StrLit` 传给 `at`。
+
+### 10.2 动态解引用：`h.*key`
+
+```
+h.*key  →  at(h, key)         # key 是变量，取其值作为路径段名
+```
+
+解析时 Pratt 消费 `.` 后读到 `*` + 标识符 → 作为裸 `Leaf` 传给 `at`，不做字符串化。这是 kvlang 内置 hash map 的语法基础：
+
+```kvlang
+"/tmp" -> h           # h = 路径前缀
+2 -> key              # key = 2
+h.*key                # at("/tmp", 2) → 读 /tmp/2
+```
+
+与传统语言的对比：
+
+| 语言 | 静态字段 | 动态字段 |
+|------|---------|---------|
+| kvlang | `h.field` | `h.*key` |
+| Python | `h["field"]` | `h[key]` |
+| Go | `h.field` | `h[key]` (map) |
+| JS | `h.field` | `h[key]` |
+
+**与 nil 配合**：`at` 查不到 key 返回 nil。存 `idx+1`（≥1），读时判断 `> 0` 区分"找到/未找到"。O(1) hash map，解锁数百道 LeetCode 题。
+
+详见 `doc/kvlang/design/kvspace-hash-map.md`。
+
 ## 11. AST 类型标记——Quote 字段
 
 `Expr.Quote` 区分字符串字面量和变量名，替代旧的 `"` 前缀 hack。parser 将 scanner 的 token Quote 信息保留到 AST，`Flat()` 在 KV 传输层加 `"` 前缀，`stringPrec` 用 `escapeString` 还原源码形式。数字字面量（如 `-5`）不再被误引号包裹。

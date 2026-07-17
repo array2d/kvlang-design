@@ -137,6 +137,28 @@ kv.at(data, _idx) -> v
 方案 B 本质和方案 C 相同（`*` 操作路径表达式而非变量），区别是
 是否需要新的运行时 opcode。方案 C 复用现有 `kv.at`，改动最小。
 
+### 方案 C 的 Two Sum 验证
+
+当前 kvlang Two Sum hash map：
+```kvlang
+set("/tmp", x, i+1) -> _       # "写入"路径 /tmp/<x>，存 i+1（避 0 falsy）
+at("/tmp", need) -> j           # "读取"路径 /tmp/<need>
+```
+
+5 种语言的同段逻辑：
+
+| 语言 | 写入 | 读取 |
+|------|------|------|
+| **C** | `ht[x] = i` | `j = ht[need]` |
+| **Go** | `m[x] = i` | `j, _ = m[need]` |
+| **Rust** | `map.insert(x, i)` | `map.get(&need)` |
+| **Python** | `d[x] = i` | `j = d.get(need)` |
+| **JS** | `m[x] = i` | `j = m[need]` |
+| **kvlang 方案 C** | `i -> */tmp/x` | `*/tmp/need -> j` |
+
+`*/tmp/x` 明确：读路径 `/tmp/<x>` 处的值。对标 C `*ptr`、Go `*ptr`、Rust `*ptr`。
+`"/tmp"` 是字符串字面量，`*/tmp/x` 是路径解引用——`*` 消除歧义。
+
 ### 后续演进
 
 若未来 kvlang 需要"先存路径、后解引用"的间接模式（如回调、虚表），

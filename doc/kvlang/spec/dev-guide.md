@@ -141,6 +141,23 @@ kvlang 的内置算子分为三组：
 | `tensor.del(path)` | 释放张量 |
 | `tensor.clone(src) -> dst` | 深拷贝 |
 
+### 3.4 KV 路径访问（内置 hash map）
+
+| 算子 | 说明 | 示例 |
+|------|------|------|
+| `at(path, key)` | 读 `path/key` 的值；不存在返回 nil | `at("/tmp", x) -> v` |
+| `set(path, key, val)` | 写 `path/key = val` | `set("/tmp", x, 1) -> _` |
+| `kv.has(path, idx)` | 检查 `path/idx` 是否存在 | `kv.has(arr, i) -> ok` |
+
+**成员访问语法**：
+
+| 语法 | 展开 | 说明 |
+|------|------|------|
+| `h.field` | `at(h, "field")` | 静态字段（字段名是字面量） |
+| `h.*key` | `at(h, key)` | **动态解引用**（取 key 的值当路径段名） |
+
+`set("/tmp", key, val)` + `at("/tmp", key)` = **内置 O(1) hash map**。存 `idx+1`（≥1），读时判断 `> 0` 区分"找到/未找到"。
+
 ## 4. 编写模式
 
 ### 4.1 最简单的测试程序
@@ -173,6 +190,23 @@ def poly3(A:int, B:int, C:int) -> (R:int) {
     './t2' + A -> './R'
 }
 poly3(2, 3, 4) -> './out'
+```
+
+### 4.4 Hash Map 模式（O(1) 查找）
+
+```kvlang
+# 模式："存 idx+1，查 > 0 判存在"
+def find_target(nums, target:int) -> () {
+  len(nums) -> n; 0 -> i
+  "/tmp" -> h                              # h = 路径前缀
+  while (i < n) {
+    nums[i] -> x; target - x -> need
+    h.*need -> j                           # at("/tmp", need)
+    j -> found                             # nil → false, >0 → true
+    if (found) { j - 1 -> k; print("[", k, ",", i, "]"); n -> i }
+    else { i + 1 -> v; set(h, x, v) -> _; i + 1 -> i }
+  }
+}
 ```
 
 ## 5. Tensor 支持

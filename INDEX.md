@@ -47,6 +47,7 @@ kvlang-design/
 │       └── design/
 │           ├── array-indexing.md             # Array & multi-dimensional index design
 │           ├── deep-dive.md                  # 🟡 Deep dive: addressing model, instruction space, function semantics
+│           ├── kvspace-hash-map.md           # 🟢 kvspace path as hash map (h.*key syntax)
 │           ├── global-variables.md           # Global variables (absolute path) design
 │           ├── pointer-semantics.md          # Pointer semantics design (string vs address)
 │           ├── self-evolving-robot.md        # Self-evolving robot (ultimate scenario)
@@ -298,7 +299,7 @@ Not suitable for: HFT / systems programming / standalone CLI / frontend Web
 | 002 No nested calls | Read-write code constraint ✅ | By design |
 | 003 No break | Bug | ✅ Fixed |
 | 004 Self-assign no-op | User misuse | No fix needed |
-| 005 Array no set | Missing operator | TODO |
+| 005 Array element set | set/at builtins exist; h.*key unlocks O(n) hash map | ✅ Resolved |
 | 006 Print colon parse | Scanner bug | ✅ Fixed |
 | 007 No `+=` | Read-write code design ✅ | By design |
 | 008 While compound condition | Lower missing | ✅ Fixed |

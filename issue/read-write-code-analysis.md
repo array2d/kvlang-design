@@ -47,12 +47,14 @@ int(_tmp) -> result
 
 ---
 
-## 005: 数组只读，无法原地修改 — ⚠️ 待修复
+## 005: 数组元素 set 已存在，hash map 已解锁 — ⚠️ 部分待修复
 
 | 维度 | 分析 |
 |------|------|
-| 是否为读写码问题 | 无关。这是缺少 `set` 算子 |
-| **建议** | 添加 `set(a, i, val)` builtin，对标 Python `a[i] = val` |
+| 是否为读写码问题 | 无关 |
+| **现状** | `set(arr, i, val)` 数组元素原地修改 已实现。`set(path, key, val)` KV 路径写入 已实现 |
+| **hash map** | `set("/tmp", key, val)` + `at("/tmp", key)` + `h.*key` 动态解引用 = 内置 hash map，O(n) 替代 O(n²)，已解锁数百道 LeetCode 题 |
+| **待修复** | `val -> *arr[idx]` 解引用写语法 尚未支持 |
 
 ---
 
@@ -97,7 +99,7 @@ while (_cond) { ... }
 | 002 禁止嵌套调用 | 读写码约束 ✅ | 设计如此 |
 | 003 break | bug | ✅ 已修复 |
 | 004 自赋值 no-op | 用户误用 | 无需修复 |
-| 005 数组 set | 算子缺失 | **待做** — 加 `set(a,i,v)` |
+| 005 数组 set/hash map | 算子已存在 | ✅ set/at 均已实现，h.*key 解锁 hash map |
 | 006 print 冒号 | scanner bug | ✅ 已修复 |
 | 007 无 += | 读写码设计 ✅ | 设计如此 |
 | 008 while 复合条件 | lower 缺失 | ✅ 已修复 |
