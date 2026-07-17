@@ -1,6 +1,6 @@
-> 本文档，遵守父级文档 `internal/ast/最高标准设计.md`，是其子模块的丰富。
+> 本文档，遵守父级文档 `internal/ast/DESIGN.md`，是其子模块的丰富。
 
-# parser 最高标准设计
+# parser DESIGN
 
 
 ---

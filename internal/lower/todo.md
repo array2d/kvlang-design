@@ -1,6 +1,6 @@
 # lower todo
 
-> 对齐目标：`internal/lower/最高标准设计.md`
+> 对齐目标：`internal/lower/DESIGN.md`
 
 ---
 

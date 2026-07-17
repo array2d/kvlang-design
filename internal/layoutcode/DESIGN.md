@@ -1,10 +1,10 @@
 ```
-import 最高标准设计.md
-import keytree/最高标准设计.md
-import kvcpu/最高标准设计.md
+import DESIGN.md
+import keytree/DESIGN.md
+import kvcpu/DESIGN.md
 ```
 
-# layoutcode 最高标准设计
+# layoutcode DESIGN
 
 ---
 

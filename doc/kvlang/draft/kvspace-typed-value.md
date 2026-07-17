@@ -1,4 +1,4 @@
-> 本文档，遵守父级文档 `doc/kvlang/设计/kvlang语言深度理解.md`，是其子模块的丰富。
+> 本文档，遵守父级文档 `doc/kvlang/design/deep-dive.md`，是其子模块的丰富。
 
 # kvspace 类型化 Value 设计 (vtype 集成版)
 

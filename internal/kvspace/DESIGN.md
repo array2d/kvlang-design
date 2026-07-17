@@ -1,4 +1,4 @@
-# kvspace 最高标准设计
+# kvspace DESIGN
 
 > 参考：etcd clientv3、FaRM/HERD RDMA KV、Go 标准库惯用法。
 > 目标：易读、低延迟、接口设计正交完备。

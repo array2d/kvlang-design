@@ -1,9 +1,9 @@
 ```
-import 最高标准设计.md
-import ast/最高标准设计.md
+import DESIGN.md
+import ast/DESIGN.md
 ```
 
-# lower 最高标准设计
+# lower DESIGN
 
 ---
 

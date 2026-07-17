@@ -1,6 +1,6 @@
 > 本文档是 kvlang 项目的根节点设计文档。
 
-# kvlang 最高标准设计
+# kvlang DESIGN
 
 ---
 

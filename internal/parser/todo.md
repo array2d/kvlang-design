@@ -1,4 +1,4 @@
-# parser todo — 违反最高标准设计的代码
+# parser todo — code violating DESIGN spec
 
 ## S10：`isNum` 启发式误判字符串字面量（inst.go `parsePrimaryExpr`）
 
@@ -45,7 +45,7 @@ if !isKVPathToken(tok.Value) {
 
 **影响**：✅ 影响当前功能（裸标识符写槽在运行时静默出错，此校验可将问题前移到解析阶段）
 
-**背景**：`funca() -> s` 是错误写法，`s` 应写为 `./s`。详见 `kvlang语言深度理解.md §3`。
+**背景**：`funca() -> s` 是错误写法，`s` 应写为 `./s`。详见 `deep-dive.md §3`。
 
 ---
 
@@ -57,7 +57,7 @@ if !isKVPathToken(tok.Value) {
 - `ast.File` 有两个出口：`Funcs []Func` 和 `TopLevelCalls []*Instruction`
 - 裸顶层语句由 `load.go` 在运行时合成 `init`，是消费层的特例处理
 
-**目标**（见 `最高标准设计.md §2.7`）：
+**目标**（见 `DESIGN.md §2.7`）：
 
 1. **`parser.go` `parseFile()` 末尾**：将 `topStmts` 合并进 `def init()`
    ```go
@@ -87,9 +87,9 @@ if !isKVPathToken(tok.Value) {
 
 ---
 
-# 最高标准设计本身的已知简化点
+# Known simplifications vs. DESIGN spec
 
-> 以下是当前 `最高标准设计.md` 与编程语言/编译器领域真正工业最高标准之间的已知差距。
+> 以下是当前 `DESIGN.md` 与编程语言/编译器领域真正工业最高标准之间的已知差距。
 > 每条标注：是否影响当前功能 / 未来需要时的升级方向。
 >
 > ✅ 已修复的标注为 **DONE**。
@@ -179,7 +179,7 @@ if !isKVPathToken(tok.Value) {
 ## S7：无形式文法规范（EBNF/PEG）
 
 **影响**：⚠️ 影响可维护性
-**升级方向**：在 `最高标准设计.md` 中补充 EBNF 一节，作为 parser 实现的权威参考。
+**升级方向**：在 `DESIGN.md` 中补充 EBNF 一节，作为 parser 实现的权威参考。
 
 ---
 

@@ -1,9 +1,9 @@
 ```
-import 最高标准设计.md
-import keytree/最高标准设计.md
+import DESIGN.md
+import keytree/DESIGN.md
 ```
 
-# kvcpu 最高标准设计
+# kvcpu DESIGN
 
 
 ---
@@ -47,7 +47,7 @@ import keytree/最高标准设计.md
 
 ### 2.1 vthread —— 执行单元
 
-> 路径规范见 `keytree/最高标准设计.md §4.3`，此处只列执行语义。
+> 路径规范见 `keytree/DESIGN.md §4.3`，此处只列执行语义。
 
 vthread 状态全部平铺为独立 key，value 均为标量字符串。
 引擎内部 key 以 `.` 开头（类比 Linux 隐藏文件），用户帧变量始终在 `[i,j]/` 下，两者结构隔离。
@@ -327,7 +327,7 @@ if signal == "error" {
 ## 八、并发安全约束
 
 > **路径所有权规则**（谁拥有哪个路径前缀、并发写规则）见
-> `keytree/最高标准设计.md §七`。
+> `keytree/DESIGN.md §七`。
 > 本节只描述 kvcpu 如何利用 kvspace 原子语义保证执行正确性。
 
 ### 8.1 原子性边界
