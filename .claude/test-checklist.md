@@ -45,11 +45,11 @@
 | 3.1 | `./kvlang kvspace clear && ./kvlang load tutorial/04-func/main.kv` | 含 `loaded 1 file(s)` |
 | 3.2 | 接上：`./kvlang kvspace get /func/main` | 含 `"entry":"pre_main"` |
 | 3.3 | 接上：`./kvlang kvspace list /vthread` | **空**（未创建 vthread）|
-| 3.4 | `./kvlang load --addr 127.0.0.1:6379 tutorial/04-func/main.kv` | 含 `loaded` |
+| 3.4 | `./kvlang load --kvspace redis://127.0.0.1:6379 tutorial/04-func/main.kv` | 含 `loaded` |
 | 3.5 | `./kvlang load tutorial/` （目录加载）| 含 `loaded N file(s)` |
 | 3.6 | `./kvlang load` （缺路径）| stderr 含 `usage:`, 退出 2 |
 | 3.7 | `./kvlang load --unknown` （未知 flag）| stderr 含 `flag provided but not defined`, 退出 2 |
-| 3.8 | `./kvlang load --help` | 打印 `--addr` 说明, 退出 0 |
+| 3.8 | `./kvlang load --help` | 打印 `--kvspace` 说明, 退出 0 |
 
 ---
 
@@ -60,7 +60,7 @@
 | # | 命令 | 期望 stdout |
 |---|------|------------|
 | 4.1 | `./kvlang kvspace clear && ./kvlang tutorial/04-func/main.kv` | `add(10,20) = 30` |
-| 4.2 | `./kvlang --addr 127.0.0.1:6379 tutorial/04-func/main.kv` | `add(10,20) = 30` |
+| 4.2 | `./kvlang --kvspace redis://127.0.0.1:6379 tutorial/04-func/main.kv` | `add(10,20) = 30` |
 | 4.3 | `./kvlang tutorial/04-func/main.kv` | `A = 2`, `B = 3`, `C = 5` |
 
 ### 4b. 内联 `-c` 模式
@@ -101,8 +101,8 @@ KV
 | # | 命令 | 期望 |
 |---|------|------|
 | 5.1 | `timeout 2 ./kvlang serve` | stderr 含 `starting`, `registered`, `workers started` |
-| 5.2 | `timeout 2 ./kvlang serve --addr 127.0.0.1:6379` | 同 5.1 且日志含 `kv=127.0.0.1:6379` |
-| 5.3 | `./kvlang serve --help` | 打印 `--addr` 说明, 退出 0 |
+| 5.2 | `timeout 2 ./kvlang serve --kvspace redis://127.0.0.1:6379` | 同 5.1 且日志含 `kv=redis://127.0.0.1:6379` |
+| 5.3 | `./kvlang serve --help` | 打印 `--kvspace` 说明, 退出 0 |
 | 5.4 | `./kvlang serve --badopt` | stderr 含 `flag provided but not defined`, 退出 2 |
 
 ### 5.5 load → serve 集成
@@ -187,7 +187,7 @@ wait  # watch 应在收到消息后退出，stdout 含 /test/q 和 hello
 
 | # | 命令 | 期望 |
 |---|------|------|
-| 8.4 | `./kvlang kvspace --addr 127.0.0.1:6379 get /func/main` | 正常返回 |
+| 8.4 | `./kvlang kvspace --kvspace redis://127.0.0.1:6379 get /func/main` | 正常返回 |
 | 8.5 | `./kvlang kvspace --addr 127.0.0.1:9999 get /any` | 连接失败错误 |
 
 ### 8e. clear
