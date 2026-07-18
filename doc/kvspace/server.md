@@ -32,9 +32,9 @@
 
 命题成立，且边界precise：
 
-| 类 | 方法（10/12） | 本质 |
+| 类 | 方法（11/13） | 本质 |
 |----|--------------|------|
-| **地址可计算** | Get/GetMany/Set/SetMany/Del/DelTree/List/Link/Unlink/DisConn | `路径 → f(路径) → 内存地址 → load/store`。f 是纯函数（hash 一跳或 radix 下降），无会合、无等待，天然适合 one-sided 访问 |
+| **地址可计算** | Get/GetMany/Set/SetMany/Del/DelTree/List/Link/Unlink/ClearAll/DisConn | `路径 → f(路径) → 内存地址 → load/store`。f 是纯函数（hash 一跳或 radix 下降），无会合、无等待，天然适合 one-sided 访问 |
 | **时间协调** | Watch/Notify | sleeper 与 waker 的**会合（rendezvous）**。地址计算只能定位队列头；"阻塞直到有值"必须引入等待原语（futex/事件/轮询）。空间可计算，**时间不可计算** |
 
 精确到子步骤：`Watch = 地址计算（定位队列）+ 等待原语（时间）`；`Notify = 地址计算 + 入队 + 唤醒`。所以"额外设计"的准确范围是**等待/唤醒机制与队列内存管理**，而非整个方法。
@@ -45,7 +45,7 @@
 
 | 系统 | 结构 | 与本设计的关系 |
 |------|------|---------------|
-| [Pilaf (USENIX ATC **2013**)](https://www.usenix.org/biblio/using-one-sided-rdma-reads-build-fast-cpu-ef%EF%AC%81cient-key-value-store) | cuckoo hash + 自校验（CRC） | one-sided GET 绕过服务端 CPU 的开山之作；注：kvspace-rdma 仓库对标表误写为 ATC'12，需更正 |
+| [Pilaf (USENIX ATC **2013**)](https://www.usenix.org/biblio/using-one-sided-rdma-reads-build-fast-cpu-ef%EF%AC%81cient-key-value-store) | cuckoo hash + 自校验（CRC） | one-sided GET 绕过服务端 CPU 的开山之作；注：kvspace-rdma 对标表原误写 ATC'12，已更正 |
 | HERD (SIGCOMM'14) | hash + RPC | 论证写路径经服务端 CPU 往往优于 one-sided 写协议 |
 | FaRM (NSDI'14) | hopscotch + version | 无锁读的 version 校验先例（kvregion seqlock 同源） |
 | [RACE (USENIX ATC 2021)](https://www.huaweicloud.com/lab/storage/news_paper_race_hashing.html) | **全单边可扩展 hash** | 首个全部操作（含插入/删除/扩容）纯 one-sided 的哈希索引；证明 hash 路线的地址可计算性可以做满 |
@@ -118,7 +118,7 @@ fix-009 的平坦成员键（`/n0.val`）在 ART 中就是同层兄弟叶子，`
 
 ## 五、结论
 
-1. 命题成立并可精确化：**10/12 方法 = 纯地址计算（f(路径)→地址）；Watch/Notify = 地址计算 + 时间协调，额外设计收敛于队列块与等待/唤醒原语**。
+1. 命题成立并可精确化：**11/13 方法 = 纯地址计算（f(路径)→地址）；Watch/Notify = 地址计算 + 时间协调，额外设计收敛于队列块与等待/唤醒原语**。
 2. C++ server 主结构选 **ART**：结构即目录（消灭 redis 双结构 bug 类，fix-013 为实证）、帧句柄缓存吃满 kvlang 前缀稳定性红利；远端 one-sided 点查按需补 hash 缓存（RACE 路线），不作 v0 目标。
 3. redis 后端保留为语义锚点与持久化选项；fix-013（Del 误清祖先索引）应先在 redis 后端修复。→ **已修复并双轮验证（fix-013）**。
 4. kvspace-rdma 仓库对标表 Pilaf 年份应更正为 **ATC 2013**。
