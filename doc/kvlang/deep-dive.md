@@ -2,6 +2,7 @@
 
 > 本文档是 kvlang 项目的**根节点设计文档**（仓库根 `DESIGN.md` 软链于此，以本文为准）。
 > §0 是设计宪法：定位、地址空间、指令分类、模块职责、禁止项；§1 起逐主题深度展开。
+> 语法 BNF：[grammar.bnf](grammar.bnf)——**每次 deep-dive 更新后需验证 BNF 与实现一致**（`tutorial/test.py` + `error_test.py` 全量通过）。
 
 ## 0. 设计宪法
 
