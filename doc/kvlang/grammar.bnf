@@ -20,10 +20,8 @@ comment = "#" { char } newline
 ## 程序结构
 
 ```
-program     = { import_stmt } [ init_block ] { top_level_stmt | function }
-
-import_stmt = "import" string newline
-              (* 必须位于文件顶部; def/init 之前; fix-033 *)
+program     = [ init_block ] { top_level_stmt | function }
+              (* 无 import 关键字——lib 树即全局命名空间，跨 lib 调用走全路径 /lib/{lib}.{func}() *)
 
 init_block  = "init" "{" { statement } "}"
 
