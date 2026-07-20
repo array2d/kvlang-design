@@ -586,7 +586,7 @@ label `then` 不是符号表条目，是 KV 路径段：
 goto(merge)  ≡  call(父函数/merge)   ← 相同语义，不同语法
 ```
 
-block 就是无参函数。控制流统一为 `call` + `return`，无需 `jmp`/`br`/`goto` 等额外原语。
+block 就是无参函数。控制流统一为 `call` + `return`，无需 `jmp`/`br`/`goto` 等额外原语。lower 阶段将 `goto`/`br` 降级为 `call(block_label)`，kvcpu 不感知结构化控制流。
 
 ### 4.3 与传统对比
 
