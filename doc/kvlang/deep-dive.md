@@ -112,47 +112,38 @@ cmd/kvlang
 | R5 | 帧销毁用 List+Del 代替 DelTree | DelTree 是原子操作 |
 | R6 | 模块间循环依赖 | 编译期杜绝 |
 
-### 0.6 文件结构、import 与 lib 命名空间（fix-033/034/035）
+### 0.6 lib 树、CLI 装载与执行模型（fix-033/034/039）
 
-**跨机器架构**：`import` 是纯 kvspace 断言，**绝不触碰文件系统**。kvlang run 进程在某台机器，被 import 的代码
-可能在另一台机器的 Redis 里——`import math` 只检查 `/lib/` 下是否存在包前缀为 `math` 的函数（即有无以 `math.` 开头的 key）。
-只有用户显式执行的 `kvlang run/load <file|dir>` 命令有文件系统访问权。
+**lib 树**：`kvlang load` 将多个 `.kv` 文件拼接为单一源→parse→lower→写入 `/lib/`。
+每个 `lib name { }` 块形成一个 lib 节点，每个 lib 有且仅有一个 `init` 函数（init 体 + 顶层代码合并）。
+`kvlang load` 完成后形成一棵 `/lib/` 下的 lib 树。
 
-- `kvlang run a.kv b.kv` → 用户指定全部源文件，先全部 load 入 kvspace，再执行 init
-- `kvlang load dir/` → 递归收集目录下全部 `.kv` 文件，仅装载不执行
-- `kvlang run lib.kv`（lib.kv 无顶层调用）→ **等同 load**，函数入 `/lib/`，进程退出（`loadFunctions` 返回 `anyCode=false` 时 `runFiles` 跳过 `executeEntry`）
-- `import math` 在源码中 → **文档级声明**，不触发文件查找。运行时若 `/lib/` 下无 `math.` 前缀函数，NameError 触发
+**执行模型**：
+- `kvlang run`（无参数）→ 执行 `/lib/.init`（匿名 lib 的 init）
+- `kvlang run {childlib}.{func}` → 执行 `/lib/{childlib}.{func}`（`/lib/` 前缀可省略，func 默认 `init`）
+- `kvlang loadandrun <files…>` → 先 load，再 run（等价 `kvlang load <files> && kvlang run`）
+- `kvlang load <file|dir>` → 多文件拼接合并为单源→parse→lower→写入 `/lib/`。每个 lib 含该 lib 的全部函数 + 一个 init。文件夹递归收集 `.kv` 并拼接
 
-**`init { }` 初始化块（fix-036）**：`init { body }` 使用 `parseBody` 全语法——支持 `if`/`while`/`for`/赋值/函数调用。
-语句包装为 `def init() -> () { body }` 经 `lower.Func` 展开为rwir，入口 `init()` 自动调用 `init`。
+**跨 lib 调用**：使用全路径 `/lib/{childlib}.{func}()`，kvcpu 经 `LibIdx("{childlib}.{func}")` 查 pkg→`LibFunc(pkg, name)` 定位指令树→Link→执行。无 `import` 机制——lib 树已在 kvspace 中，调用即路径。
+
+**`def init() -> () { }` 初始化函数（fix-036）**：与普通 def 语法一致，支持 `if`/`while`/`for`/赋值/函数调用。裸顶层代码自动封装为隐式 `def init() -> () { }`。
 
 ```kv
-import math                   # 文档级声明：期望 /lib/ 下 math. 前缀函数已就绪
-import "aaa/bbb" as c         # as 别名：c.func() 在 parse 期还原为 aaa/bbb.func()（fix-035）
-
-lib math {                    # 命名空间块：函数注册为 /lib/math.sum, /lib/math.twice …
+lib math {
     def sum(A:int, B:int) -> (C:int) { A + B -> C }
 }
 
-init {                        # 初始化块（parseBody 全语法）
-    total = 0                 # 赋值
-    1 -> i
-    while (i <= 10) {         # 循环
-        total <- total + i
-        i + 1 -> i
-    }
-    print(total)
+def init() -> () {
+    /lib/math.sum(3, 4) -> s   # 跨 lib 调用：全路径
+    print(s)
 }
-
-def legacy() -> () { … }     # 无 lib 的 def：默认包 main，注册到 /lib/main.legacy（parser warning）
 ```
 
-- `lib name { }` 借鉴 C++ `namespace` / Rust `mod`，包名与函数名以 `.` 分隔，存储路径为 `/lib/<pkg>.<name>`
-- 无 lib 的 def 默认包名为 `main`，存储路径 `/lib/main.<name>`，parser 建议包裹 `lib pkgname { }`
-- lib 块内函数**调用使用裸函数名**（如 `twice(21)`），不需要包名前缀——`/lib/idx/<name>` 反向索引已提供唯一映射
-- `as` 别名在 dotted call 时还原为全路径——`c.add(3,4)` 解析为 `aaa/bbb.add(3,4)`
+- `lib name { }` 借鉴 C++ `namespace` / Rust `mod`。支持嵌套 `lib a { lib b { … } }` 形成 `a.b` 级联包名，也支持扁平 `lib a/b/c { }`。每个 lib 含一个 `init` 函数（该 lib 的入口）
+- lib 树中每个 lib 节点注册在 `/lib/<name>.{func}` 下（`/lib/math.sum`、`/lib/math.init`）
+- 无 lib 包裹的 def 属于匿名 lib（路径 `/lib/.{func}`，`kvlang run` 无参默认执行 `/lib/.init`）
 - 源码存储：`WriteFunc` 写入 `/lib/<pkg>.<name>.src`（fix-034），与指令树同目录
-- **目录名/文件名不参与包命名**——仅 `lib name { }` 声明包名
+- 无 `import` 关键字——lib 树即全局命名空间，跨 lib 调用走全路径 `/lib/{lib}.{func}()`
 
 ## 1. 寻址模型：KV 路径 vs 内存地址
 
