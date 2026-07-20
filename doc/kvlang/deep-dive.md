@@ -123,6 +123,7 @@ cmd/kvlang
 | R4 | 破坏单层 IR：新增 HIR/LIR 分层 | kvlang 只一层 IR |
 | R5 | 帧销毁用 List+Del 代替 DelTree | DelTree 是原子操作 |
 | R6 | 模块间循环依赖 | 编译期杜绝 |
+| R7 | `fmt.Fprint*` 直接写 stderr 做诊断 | 所有诊断必须经 `internal/logx`（§0.7）；usage/help/格式化除外 |
 
 ### 0.6 lib 树、CLI 装载与执行模型（fix-033/034/039）
 
@@ -156,6 +157,29 @@ def init() -> () {
 - 无 lib 包裹的 def 属于匿名 lib（路径 `/lib/.{func}`，`kvlang run` 无参默认执行 `/lib/.init`）
 - 源码存储：`WriteFunc` 写入 `/lib/<pkg>.<name>.src`（fix-034），与指令树同目录
 - 无 `import` 关键字——lib 树即全局命名空间，跨 lib 调用走全路径 `/lib/{lib}.{func}()`
+
+### 0.7 诊断输出规范（logx）
+
+**所有 stderr 诊断输出必须通过 `internal/logx` 包，禁止直接调用 `fmt.Fprint*`。** 输出格式对齐五大语言编译器（GCC/Go/V8）：`{level}: {context}: {msg}`，无时间戳、无 key=value。
+
+**logx API 范式：**
+
+| 函数 | 前缀 | 用途 |
+|------|------|------|
+| `Debug/Info` | 无 | 操作消息、调试追踪（仅 `LOG_LEVEL=debug`/`info` 可见） |
+| `Warn` | `warn: ` 自动 | 可恢复警告 |
+| `Error` | `error: ` 自动 | 错误信息 |
+| `Fatal` | 同 Error | 错误 + `os.Exit(1)` |
+| `Diag(d)` | Diagnostic 自带 | parser 诊断单行输出 |
+| `DiagWithSource(d)` | Diagnostic 自带 | parser 诊断 + 源码行 + `^` caret |
+
+**明确豁免 `fmt.Fprint*` 的情形：**
+- `flag.FlagSet.Usage` 内的 usage 文本（无前缀的说明文字）
+- help 命令的输出（完整帮助文档）
+- `fmt.Printf` 到 stdout 的成功状态（如 `%s: OK`）
+- `ast.Dump` / `ast.Format` 的格式化输出（到 `io.Writer`，非诊断）
+
+**原则：如果你在写诊断，走 logx；如果你在写内容（help / usage / 格式化 / stdout 结果），走 fmt。**
 
 ## 1. 寻址模型：KV 路径 vs 内存地址
 
