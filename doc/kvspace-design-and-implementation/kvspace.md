@@ -43,13 +43,9 @@ TLV wire format: [1B kind_len][N B kind_name][4B raw_len LE][M B raw_value]
 | `array1d` | `Array(elems)` | `v.Len()`, `v.Index(i)` | [4B count][elem TLV]… |
 | `dict` | `Dict()` | — | 空，键族标记 |
 | `time` | `Time(ns)` | `v.TimeNs()` | 8B LE UnixNano |
-| `mount` | — | — | target 路径字节 |
-| `overlay` | — | — | `w_path\nr_path` 字节 |
 | 任意 | `Raw(kind, raw)` | `v.RawBytes()` | 原始 |
 
-`Int64()`/`Uint64()`/`Float64()` 宽容读取：kind 不对齐返回 0，不 panic。
-
-`mount` 和 `overlay` 是系统 kind，由 Mount/Overlay 内部 TLV 存储，不暴露用户构造。
+`Int64()`/`Uint64()`/`Float64()` 是宽容读取器：kind 对不齐时返回 0，不 panic。
 
 ## 路径模型
 
@@ -85,42 +81,64 @@ func JoinPath(parent, child string) string {
 
 ```go
 const (
-    PathSep     = "/"  // 路径分隔符
-    DirIndexSuf = "/"  // 目录索引后缀
+    PathSep     = "/"   // 路径分隔符
+    DirIndexSuf = "/"   // 目录索引后缀
+    LinkSentinel    = "->" // mount 标记
+    OverlaySentinel = "#>" // overlay 标记
 )
 
 // XValue kind
 const (
-    KindNull    = "null"
-    KindInt64   = "int64"    // + int8/16/32, uint8/16/32/64, float32/64
-    KindString  = "string"
-    KindBytes   = "bytes"
+    KindNull = "null"
+    KindInt64 = "int64"  // + int8/16/32, uint8/16/32/64, float32/64
+    KindString = "string"
+    KindBytes  = "bytes"
     KindArray1d = "array1d"
-    KindDict    = "dict"
-    KindMount   = "mount"    // raw = target 路径
-    KindOverlay = "overlay"  // raw = "w_path\nr_path"
+    KindDict  = "dict"
+    // ...
 )
 ```
 
 ## Mount 系统
 
-Mount 和 Overlay 以 XValue TLV 存储在对应 key 上。`checkLinkEntry` 惰性 `DecodeXValue` 解析并全量缓存。
+### 存储格式
+
+```
+Mount:   SET linkpath  "->target"          → 简单路径重定向
+Overlay: SET target    "#>w_path\nr_path"  → 叠加层（先 w 后 r）
+```
+
+两种类型通过首字节区分：`-` = mount，`#` = overlay。
 
 ### Mount
 
-`Mount("/real", "/alias")` 写入 `TLV{kind=mount, raw="/real"}` → `/alias`。`ResolveCore` 路径解析时透明替换 `/alias/x` → `/real/x`，40 跳防环。
+`Mount("/real", "/alias")` 写入 `->/real` 到 `/alias`。`ResolveCore` 在路径解析时透明替换 `/alias/x` → `/real/x`。最多 40 跳防环。
 
-### Overlay
+### Overlay 
 
-`Overlay("/merged", "/r", "/w")` 写入 `TLV{kind=overlay, raw="/w\n/r"}` → `/merged`。
+`Overlay("/merged", "/readonly", "/writable")` 创建叠加层，写入 `#>\/writable\n/readonly` 到 `/merged`。
 
-**读路径**：`resolveOL(path)` 沿路径从深到浅逐级查 `checkLinkEntry`，找最深层 overlay 祖先 → 返回 `(wPrefix, rPrefix)` → `Get` 先 GET w 路径，miss 则 fallback GET r 路径。
+**读路径**：`Get("/merged/x")` → `resolveOL` 沿路径向上查找 overlay 祖先 → 返回 `(wPrefix, rPrefix)` → 先 `GET wPrefix`，miss 则 fallback `GET rPrefix`。
 
-**写路径**：`Set` 发现 overlay → 将 resolved key 替换为 w 路径。r 层只读。
+**写路径**：`Set("/merged/x", val)` → 发现 overlay → 直接写入 w 层（`/writable/x`）。r 层只读，绝不写入。
 
-**List**：`List` 发现 overlay → 合并 `SMEMBERS dirKey(wPrefix)` + `SMEMBERS dirKey(rPrefix)`，w 的条目去重优先。
+**List**：`List("/merged")` → 合并 `SMEMBERS dirKey(wPrefix)` + `SMEMBERS dirKey(rPrefix)`，w 的条目去重优先。
 
 **UnMount**：删除 w 层全部数据及索引，再删除 overlay 标记本身。r 层不受影响。
+
+## Redis 实现
+
+### 连接注册
+
+```go
+kv := kvspace.Conn("redis://host:port")  // 默认 poolSize=16
+```
+
+DSN scheme 注册：`init()` 中 `kvspace.Register("redis", ConnPool)`。`ConnPool` 创建 go-redis 连接池（MinIdleConns、PoolTimeout、Read/WriteTimeout）。
+
+### 索引维护
+
+`Set` 写入 key 时，对路径的每级父目录 `SADD dirKey(parent) child` 维护索引。`Del` 删除 key 时，`delIndex` 级联清理空目录：若目录已无子项且自身无 value，则从祖父索引中 SREM 该目录名，沿祖先链向上重复。
 
 ### linkEntry 缓存
 
@@ -133,21 +151,15 @@ type linkEntry struct {
 }
 ```
 
-`checkLinkEntry(path)`：首次查 Redis → `DecodeXValue` → 按 kind 解析。之后走内存缓存。
+`checkLinkEntry(path)`：惰性加载 + 全缓存。首次访问查 Redis，根据 sentinel（`->` 或 `#>`）解析为 mount 或 overlay。之后所有访问走内存缓存，零 Redis 查询。
 
-## Redis 实现
+`resolveOL(path)`：沿路径从深到浅逐级查 `checkLinkEntry`，返回最深层 overlay 祖先的 `(wPrefix, rPrefix)`。无 overlay 返回 `("", "", false)`。
 
-### 连接注册
+### Get/Set/List 的 overlay 分支
 
-```go
-kv := kvspace.Conn("redis://host:port")  // 默认 poolSize=16
-```
-
-DSN scheme 注册：`init()` 中 `kvspace.Register("redis", ConnPool)`。
-
-### 索引维护
-
-`Set` 对路径每级父目录 `SADD dirKey(parent) child` 维护索引。`Del` 的 `delIndex` 级联清理空目录：目录无子项且自身无 value → 从祖父索引 SREM，沿祖先链向上重复。
+- **Get**：`ResolveCore` 先解析普通 mount 链接，再 `resolveOL` 检测 overlay。无 overlay 走 pipeline 批量 GET。有 overlay 的 key 单独处理：先 GET w 路径，miss 则 GET r 路径。
+- **Set**：`ResolveCore` → `resolveOL`，发现 overlay 则将 resolved key 替换为 w 层路径。写入只落 w。
+- **List**：发现 overlay 则合并两层的 `SMEMBERS`，w 的 key 去重优先。
 
 ## Walk
 
@@ -155,7 +167,7 @@ DSN scheme 注册：`init()` 中 `kvspace.Register("redis", ConnPool)`。
 func Walk(kv KVSpace, prefix string, fn func(path string, v XValue))
 ```
 
-深度优先递归遍历。节点无值时 fn 不被调用。
+深度优先递归遍历。节点无值时 fn 不被调用。遍历顺序：前缀序（等同于 `ls -R`）。
 
 ## CLI 工具
 
@@ -166,7 +178,7 @@ kvspace del /a /b              # 精确删除
 kvspace deltree /prefix        # 递归删除
 kvspace list /                 # 列出子项
 kvspace tree /                 # 可视化树（含 [s0,s1] 二维表格打印）
-kvspace dump /                 # 递归遍历
+kvspace dump /                 # 递归遍历，每行 key:value
 kvspace watch --timeout 5s /k  # 阻塞等待通知
 kvspace notify /k string:msg   # 推送通知
 kvspace mount /real /alias     # 创建路径映射
